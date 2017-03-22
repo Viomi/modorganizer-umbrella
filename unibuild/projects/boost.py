@@ -17,26 +17,48 @@ boost_components = [
 ]
 
 
-config_template = ("using python : 2.7 : {0}\\PCbuild\\python.exe\n"
-                   "  : {0}\\include\n"
-                   "  : {0}\\lib\n"
-                   "  : <address-model>{1} ;")
-
+config_template = ("using python\n"
+                   "  : 2.7\n"
+                   "  : {0}/python.exe\n"
+                   "  : {1}/Include\n"
+                   "  : {0}\n"
+                   "  : <address-model>{2}\n"
+                   "  : <define>BOOST_ALL_NO_LIB=1\n"
+                   "  ;")
 
 Project("boost") \
-    .depend(b2.B2().arguments(["address-model={}".format("64" if config['architecture'] == 'x86_64' else "32"),
-                               "toolset=msvc-12.0",
-                               "link=shared"
-                               ] + ["--with-{0}".format(component) for component in boost_components])
+    .depend(b2.B2(name="Shared").arguments(["address-model={}".format("64" if config['architecture'] == 'x86_64' else "32"),
+                                            "-a",
+                                            "--user-config={}".format(os.path.join(config['paths']['build'],
+                                                                                   "boost_{}".format(boost_version.
+                                                                                                   replace(".", "_")),
+                                                                                   "user-config.jam")),
+                                            "-j {}".format(config['num_jobs']),
+                                            "toolset=msvc-14.0",
+                                            "link=shared",
+                                            ] + ["--with-{0}".format(component) for component in boost_components])
+        .depend(b2.B2(name="Static").arguments(["address-model={}".format("64" if config['architecture'] == 'x86_64' else "32"),
+                                                "-a",
+                                                "--user-config={}".format(os.path.join(config['paths']['build'],
+                                                                                       "boost_{}".format(boost_version.
+                                                                                                       replace(".", "_")), "user-config.jam")),
+                                                "-j {}".format(config['num_jobs']),
+                                                "toolset=msvc-14.0",
+                                                "link=static",
+                                                "runtime-link=shared",
+                                                ] + ["--with-{0}".format(component) for component in boost_components])
             .depend(patch.CreateFile("user-config.jam",
                                      lambda: config_template.format(
-                                             os.path.dirname(python.python['build_path']),
-                                             "64" if config['architecture'] == "x86_64" else "32")
+                                         os.path.join(python.python['build_path'], "PCBuild",
+                                                      "{}".format("" if config['architecture'] == 'x86' else "amd64")).replace("\\",'/'),
+                                        os.path.join(python.python['build_path']).replace("\\",'/'),
+                                         "64" if config['architecture'] == "x86_64" else "32")
                                      )
                     .depend(sourceforge.Release("boost",
                                                 "boost/{0}/boost_{1}.tar.bz2".format(boost_version,
                                                                                      boost_version.replace(".", "_")),
                                                 tree_depth=1))
-                    )
-            ) \
-    .depend("Python")
+                    ).depend("Python")
+                )
+            )
+

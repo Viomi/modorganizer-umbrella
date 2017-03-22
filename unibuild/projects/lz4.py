@@ -17,23 +17,14 @@
 
 
 from unibuild import Project
-from unibuild.modules import cmake, github
+from unibuild.modules import github
 from config import config
 
 
-# asmjit doesn't currently have any tags/branches but not every commit is usable
-asmjit_tag = "master"
 
+lz4_version = "v1.7.4"
 
-Project("AsmJit") \
-    .depend(cmake.CMake().arguments(
-    [
-        "-DASMJIT_STATIC=TRUE",
-        "-DASMJIT_DISABLE_COMPILER=TRUE",
-        "-DCMAKE_INSTALL_PREFIX:PATH={}/install".format(config['__build_base_path'].replace('\\', '/')),
-        "-DCMAKE_BUILD_TYPE={0}".format(config["build_type"]),
-    ]).install()
-            .depend(github.Source("kobalicek", "asmjit", asmjit_tag, update=False)
-                    .set_destination("asmjit"))
-            )
+Project("lz4") \
+            .depend(github.Release("lz4", "lz4", lz4_version, "lz4_{0}_win{1}".format(lz4_version.replace(".","_"),"64" if config['architecture'] == 'x86_64' else "32"),"zip")
+                    .set_destination("lz4"))
 

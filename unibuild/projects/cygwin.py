@@ -17,7 +17,7 @@
 
 
 from unibuild import Project
-from unibuild.modules import urldownload, build, patch
+from unibuild.modules import urldownload, build
 from config import config
 from subprocess import Popen
 import os
@@ -26,13 +26,6 @@ import time
 import shutil
 
 
-# currently binary installation only
-
-
-openssl_version = "1.0.2j"
-
-libeay = "libeay32MD.lib"
-ssleay = "ssleay32MD.lib"
 # installation happens concurrently in separate process. We need to wait for all relevant files to exist,
 # and can determine failure only by timeout
 timeout = 15   # seconds
@@ -41,48 +34,44 @@ timeout = 15   # seconds
 def bitness():
     return "64" if config['architecture'] == "x86_64" else "32"
 
-filename = "Win{}OpenSSL-{}.exe".format(bitness(), openssl_version.replace(".", "_"))
+filename = "setup-x86_64.exe"
 
-url = "https://slproweb.com/download/{}".format(filename)
+url = "http://www.cygwin.com/setup-x86_64.exe"
+
+Cygwin_Mirror = "http://mirrors.kernel.org/sourceware/cygwin/"
 
 
 def build_func(context):
     proc = Popen([os.path.join(config['paths']['download'], filename),
-                  "/VERYSILENT", "/DIR={}".format(context['build_path'])],
-                 env=config['__environment'])
+                  "-q", "-C", "Base", "-P", "make,dos2unix,binutils", "-n", "-d", "-O", "-B", "-R", "{}/../cygwin"
+                 .format(context['build_path']), "-l", "{}".format(os.path.join(config['paths']['download'])),
+                  "-s", "{}".format(Cygwin_Mirror)],env=config['__environment'])
     proc.communicate()
     if proc.returncode != 0:
         logging.error("failed to run installer (returncode %s)",
                       proc.returncode)
         return False
-    libeay_path = os.path.join(context['build_path'], "lib", "VC", "static", libeay)
-    ssleay_path = os.path.join(context['build_path'], "lib", "VC", "static", ssleay)
+    dos2unix_path = os.path.join(context['build_path'],"../cygwin","bin", "dos2unix.exe")
+    make_path = os.path.join(context['build_path'],"../cygwin", "bin", "make.exe")
     wait_counter = timeout
     while wait_counter > 0:
-        if os.path.isfile(libeay_path) and os.path.isfile(ssleay_path):
+        if os.path.isfile(dos2unix_path) and os.path.isfile(make_path):
             break
         else:
-            time.sleep(1.0)
-            wait_counter -= 1
+            time.sleep(5.0)
+            wait_counter -= 5
     # wait a bit longer because the installer may have been in the process of writing the file
-    time.sleep(1.0)
+    time.sleep(5.0)
 
     if wait_counter<=0:
-        logging.error("Unpacking of OpenSSL timed out");
+        logging.error("Unpacking of Cygwin timed out");
         return False #We timed out and nothing was installed
     
     return True
 
 
-openssl = Project("openssl") \
-    .depend(patch.Copy([os.path.join(config['paths']['build'], "Win{0}OpenSSL-{1}"
-                                     .format("32" if config['architecture'] == 'x86' else "64",
-                                             openssl_version.replace(".","_")), "ssleay32.dll"),
-                        os.path.join(config['paths']['build'], "Win{0}OpenSSL-{1}"
-                                     .format("32" if config['architecture'] == 'x86' else "64",
-                                             openssl_version.replace(".", "_")), "libeay32.dll"),],
-                       os.path.join(config['__build_base_path'], "install", "bin","dlls"))
+cygwin = Project("cygwin")\
     .depend(build.Execute(build_func)
             .depend(urldownload.URLDownload(url))
-            ))
+            )
 

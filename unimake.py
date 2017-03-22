@@ -33,7 +33,6 @@ import os.path
 import argparse
 import re
 
-
 def progress_callback(job, percentage):
     if not percentage and not job:
         sys.stdout.write("\n")
@@ -50,8 +49,7 @@ def draw_graph(graph, filename):
     if config['paths']['graphviz']:
         # neither pydot nor pygraphviz reliably find graphviz on windows. gotta do everything myself...
         from subprocess import call
-
-        graph_file_name = os.path.join(tempfile.gettempdir(), "graph.dot")
+        graph_file_name = os.path.join(os.getcwd(), "graph.dot")
         nx.write_dot(graph, graph_file_name)
 
         call([config['paths']['graphviz'],
@@ -96,7 +94,7 @@ def visual_studio_environment():
 def init_config(args):
     for d in config['paths'].keys():
         if isinstance(config['paths'][d], str):
-            config['paths'][d] = config['paths'][d].format(base_dir=args.destination)
+            config['paths'][d] = config['paths'][d].format(base_dir=os.path.abspath(args.destination))
 
     if args.set:
         for setting in args.set:
@@ -111,12 +109,12 @@ def init_config(args):
         raise ValueError("only architectures supported are x86 and x86_64")
 
     config['__environment'] = visual_studio_environment()
-    config['__build_base_path'] = args.destination
+    config['__build_base_path'] = os.path.abspath(args.destination)
 
     if 'PYTHON' not in config['__environment']:
         config['__environment']['PYTHON'] = sys.executable
 
-    qtcreator_config_path = r"C:/Users/Tannin/AppData/Roaming/QtProject"
+    qtcreator_config_path = r"C:/Users/modorganizer/AppData/Roaming/QtProject"
 
     if os.path.isdir(qtcreator_config_path):
         from ConfigParser import RawConfigParser
@@ -139,7 +137,7 @@ def init_config(args):
         profiles = filter(lambda x: arch in x[1], sorted(profiles, reverse=True))[0]
 
         config['qt_profile_id'] = profiles[0]
-        config['qt_profile_name'] = profiles[1].replace("%{Qt:Version}", "5.4.0")
+        config['qt_profile_name'] = profiles[1].replace("%{Qt:Version}", "5.5.1")
 
         """
         kits = sorted([kit.text
